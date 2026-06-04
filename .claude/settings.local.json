@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git ls-remote *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git reset *)",
+      "Bash(git commit *)",
+      "Bash(git branch *)",
+      "Bash(git checkout *)",
+      "mcp__unityMCP__read_console",
+      "mcp__unityMCP__manage_packages",
+      "mcp__unityMCP__get_test_job",
+      "mcp__unityMCP__manage_editor",
+      "mcp__unityMCP__refresh_unity"
+    ],
+    "deny": [
+      "Read(.vs/**)",
+      "Read(Library/**)",
+      "Read(Logs/**)",
+      "Read(obj/**)",
+      "Read(Packages/**)",
+      "Read(ProjectSettings/**)",
+      "Read(Temp/**)",
+      "Read(UserSettings/**)",
+      "Read(**/*.meta)",
+      "Read(**/*.prefab)",
+      "Read(**/*.asset)",
+      "Read(**/*.dll)",
+      "Read(**/*.wav)",
+      "Read(**/*.mp3)",
+      "Read(**/*.mp4)",
+      "Read(**/*.anim)",
+      "Read(**/*.tiff)",
+      "Read(**/*.png)",
+      "Read(**/*.jpg)",
+      "Read(**/*.psd)",
+      "Read(**/*.fbx)",
+      "Read(**/*.unity)",
+      "Read(**/*.shader)",
+      "Read(**/*.bat)",
+      "Read(**/*.keystore)",
+      "Read(**/*.p12)"
+    ]
+  },
+  "model": "sonnet",
+  "language": "korean",
+  "max_thinking_tokens": 10000,
+  "secondary_agent_model": "haiku"
+}
