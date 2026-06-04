@@ -13,7 +13,8 @@
       "mcp__unityMCP__manage_packages",
       "mcp__unityMCP__get_test_job",
       "mcp__unityMCP__manage_editor",
-      "mcp__unityMCP__refresh_unity"
+      "mcp__unityMCP__refresh_unity",
+      "Bash(Select-Object -Last 5)"
     ],
     "deny": [
       "Read(.vs/**)",
