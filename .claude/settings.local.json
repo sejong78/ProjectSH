@@ -14,7 +14,9 @@
       "mcp__unityMCP__get_test_job",
       "mcp__unityMCP__manage_editor",
       "mcp__unityMCP__refresh_unity",
-      "Bash(Select-Object -Last 5)"
+      "Bash(Select-Object -Last 5)",
+      "WebFetch(domain:news.hada.io)",
+      "Bash(claude plugin *)"
     ],
     "deny": [
       "Read(.vs/**)",
