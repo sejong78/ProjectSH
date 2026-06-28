@@ -22,8 +22,10 @@ public class RailMapBuilderWindow : EditorWindow
     private const string MATERIAL_PATH = "Assets/00.Scenes/Maps/SpeedMarker.mat";
 
     private View_RailMap     _target        = null;
+    private string           _sceneName     = "";
     private bool             _autoBake      = true;
     private LightmapBakeType _bakeLightMode = LightmapBakeType.Mixed;
+    private float            _gridMargin    = 6f;
     private string           _status        = "대기 중.";
     private Vector2          _scroll        = Vector2.zero;
 
@@ -73,12 +75,25 @@ public class RailMapBuilderWindow : EditorWindow
 
             EditorGUILayout.Space();
 
+            // RailPath / 격자 정리
+            EditorGUILayout.LabelField( "RailPath · 격자 정리", EditorStyles.miniBoldLabel );
+            if( GUILayout.Button( "제어점 자동 정렬·등록 (CP_n)" ) )
+                RebuildControlPoints();
+            EditorGUILayout.BeginHorizontal();
+            _gridMargin = EditorGUILayout.FloatField( "격자 여유(m)", _gridMargin );
+            if( GUILayout.Button( "격자 크기 맵에 맞춤" ) )
+                FitGridToBounds();
+            EditorGUILayout.EndHorizontal();
+
+            EditorGUILayout.Space();
+
             // Export
             EditorGUILayout.LabelField( "2. 맵 서브신 Export", EditorStyles.miniBoldLabel );
+            _sceneName = EditorGUILayout.TextField( "저장 씬 이름", _sceneName );
             _autoBake = EditorGUILayout.ToggleLeft( "Export 시 라이팅 자동 베이크", _autoBake );
             if( true == _autoBake )
                 _bakeLightMode = (LightmapBakeType)EditorGUILayout.EnumPopup( "라이트 모드(자동 전환)", _bakeLightMode );
-            EditorGUILayout.HelpBox( $"출력: {MAPS_FOLDER}/<MapId>.unity\n마커 베이크 → 클론 → 서브신 저장 → Build Settings 등록" + ( _autoBake ? $" → 라이트 {_bakeLightMode} 전환 → 베이크" : "" ), MessageType.None );
+            EditorGUILayout.HelpBox( $"출력: {MAPS_FOLDER}/{ResolveSceneName()}.unity\n마커 베이크 → 클론 → 서브신 저장 → Build Settings 등록" + ( _autoBake ? $" → 라이트 {_bakeLightMode} 전환 → 베이크" : "" ), MessageType.None );
             if( GUILayout.Button( "맵 서브신 Export", GUILayout.Height( 30f ) ) )
                 ExportMapScene();
 
@@ -111,7 +126,22 @@ public class RailMapBuilderWindow : EditorWindow
         }
 
         _target = found;
+        if( true == string.IsNullOrEmpty( _sceneName ) )
+            _sceneName = found.MapId;
         SetStatus( $"대상 지정: {found.name} (MapId: {found.MapId})" );
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// 저장할 씬 이름을 결정한다. 입력값 우선, 비면 MapId, 그것도 비면 대상 이름.
+    /// </summary>
+    private string ResolveSceneName()
+    {
+        if( false == string.IsNullOrEmpty( _sceneName ) )
+            return _sceneName.Trim();
+        if( null != _target && false == string.IsNullOrEmpty( _target.MapId ) )
+            return _target.MapId;
+        return ( null != _target ) ? _target.name : "Map";
     }
 
     //@@-------------------------------------------------------------------------------------------------------------------------
@@ -160,6 +190,125 @@ public class RailMapBuilderWindow : EditorWindow
         spawner.ClearMarkers();
         EditorSceneManager.MarkSceneDirty( _target.gameObject.scene );
         SetStatus( "마커 클리어 완료." );
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// RailPath 자식 GameObject들을 계층 순서대로 CP_n으로 리네임하고 _controlPoints에 등록·갱신한다.
+    /// </summary>
+    private void RebuildControlPoints()
+    {
+        if( null == _target )
+            return;
+
+        View_RailPath rail = _target.RailPath;
+        if( null == rail )
+        {
+            SetStatus( "RailPath 없음 → 정렬 불가.", true );
+            return;
+        }
+
+        Transform root = rail.transform;
+        int       n    = root.childCount;
+        if( n < 4 )
+        {
+            SetStatus( $"제어점 {n}개 — 닫힌 곡선은 최소 4개 필요.", true );
+            return;
+        }
+
+        Undo.RegisterFullObjectHierarchyUndo( rail.gameObject, "Rebuild Control Points" );
+
+        SerializedObject   so   = new SerializedObject( rail );
+        SerializedProperty list = so.FindProperty( "_controlPoints" );
+        list.ClearArray();
+        list.arraySize = n;
+        for( int i = 0; i < n; ++i )
+        {
+            Transform child = root.GetChild( i );
+            child.name = "CP_" + i;
+            list.GetArrayElementAtIndex( i ).objectReferenceValue = child;
+        }
+        so.ApplyModifiedProperties();
+
+        rail.Rebuild();
+        EditorSceneManager.MarkSceneDirty( rail.gameObject.scene );
+        SetStatus( $"제어점 {n}개 정렬·등록 완료 (길이 {rail.TotalLength:F1}m)" );
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// 격자(View_GridFloor) 크기를 RailPath 제어점 + 맵 렌더러를 모두 포함하도록 자동 조정한다.
+    /// 격자는 자신의 트랜스폼 위치 기준 정사각이므로, 중심에서의 최대 반경 기반으로 _worldSize를 산출한다.
+    /// </summary>
+    private void FitGridToBounds()
+    {
+        if( null == _target )
+            return;
+
+        View_GridFloor grid = _target.GetComponentInChildren<View_GridFloor>( true );
+        if( null == grid )
+        {
+            SetStatus( "View_GridFloor 없음 → 맞춤 불가.", true );
+            return;
+        }
+
+        Bounds b   = new Bounds();
+        bool   has = false;
+
+        // RailPath 제어점 포함
+        View_RailPath rail = _target.RailPath;
+        if( null != rail )
+        {
+            Transform rt = rail.transform;
+            for( int i = 0; i < rt.childCount; ++i )
+            {
+                Vector3 p = rt.GetChild( i ).position;
+                if( false == has ) { b = new Bounds( p, Vector3.zero ); has = true; }
+                else b.Encapsulate( p );
+            }
+        }
+
+        // 맵 렌더러 포함(격자 자신 제외, 빈 바운드 제외)
+        Renderer[] rends = _target.GetComponentsInChildren<Renderer>( true );
+        for( int i = 0; i < rends.Length; ++i )
+        {
+            if( rends[ i ].gameObject == grid.gameObject )
+                continue;
+
+            Bounds rb = rends[ i ].bounds;
+            if( rb.size.sqrMagnitude < 1e-6f )
+                continue;
+
+            if( false == has ) { b = rb; has = true; }
+            else b.Encapsulate( rb );
+        }
+
+        if( false == has )
+        {
+            SetStatus( "맞출 대상 없음(제어점/렌더러).", true );
+            return;
+        }
+
+        Vector3 c    = grid.transform.position;
+        float   dx   = Mathf.Max( Mathf.Abs( b.max.x - c.x ), Mathf.Abs( c.x - b.min.x ) );
+        float   dz   = Mathf.Max( Mathf.Abs( b.max.z - c.z ), Mathf.Abs( c.z - b.min.z ) );
+        float   half = Mathf.Max( dx, dz ) + Mathf.Max( 0f, _gridMargin );
+
+        SerializedObject   so       = new SerializedObject( grid );
+        SerializedProperty cellProp = so.FindProperty( "_cellSize" );
+        float cell = ( null != cellProp ) ? cellProp.floatValue : 2f;
+        if( cell < 0.1f )
+            cell = 0.1f;
+
+        float size = Mathf.Ceil( ( half * 2f ) / cell ) * cell;
+
+        SerializedProperty sizeProp = so.FindProperty( "_worldSize" );
+        if( null != sizeProp )
+            sizeProp.floatValue = size;
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty( grid.gameObject.scene );
+        SetStatus( $"격자 크기 {size:F1}m로 맞춤 (여유 {_gridMargin}m, 중심 {c.x:F0},{c.z:F0})" );
     }
 
     //@@-------------------------------------------------------------------------------------------------------------------------
@@ -229,7 +378,7 @@ public class RailMapBuilderWindow : EditorWindow
 
         EnsureMapsFolder();
 
-        string mapId      = string.IsNullOrEmpty( _target.MapId ) ? _target.name : _target.MapId;
+        string mapId      = ResolveSceneName();
         string scenePath  = $"{MAPS_FOLDER}/{mapId}.unity";
         string authoring  = _target.gameObject.scene.path;
 
