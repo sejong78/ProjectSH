@@ -21,13 +21,17 @@ public class RailMapBuilderWindow : EditorWindow
     private const string MAPS_FOLDER   = "Assets/00.Scenes/Maps";
     private const string MATERIAL_PATH = "Assets/00.Scenes/Maps/SpeedMarker.mat";
 
-    private View_RailMap     _target        = null;
-    private string           _sceneName     = "";
-    private bool             _autoBake      = true;
-    private LightmapBakeType _bakeLightMode = LightmapBakeType.Mixed;
-    private float            _gridMargin    = 6f;
-    private string           _status        = "대기 중.";
-    private Vector2          _scroll        = Vector2.zero;
+    private const float RAY_UP   = 1000f;   // 높이 샘플 Raycast 시작점(격자 평면 위)
+    private const float RAY_DOWN = 2000f;   // 추가 하강 거리
+
+    private View_RailMap     _target         = null;
+    private string           _sceneName      = "";
+    private bool             _autoBake       = true;
+    private LightmapBakeType _bakeLightMode  = LightmapBakeType.Mixed;
+    private float            _gridMargin     = 6f;
+    private bool             _bakeGridHeight = true;
+    private string           _status         = "대기 중.";
+    private Vector2          _scroll         = Vector2.zero;
 
     //@@-------------------------------------------------------------------------------------------------------------------------
     //@@-------------------------------------------------------------------------------------------------------------------------
@@ -84,16 +88,19 @@ public class RailMapBuilderWindow : EditorWindow
             if( GUILayout.Button( "격자 크기 맵에 맞춤" ) )
                 FitGridToBounds();
             EditorGUILayout.EndHorizontal();
+            if( GUILayout.Button( "지형 높이 격자 베이크 (Terrain→Raycast)" ) )
+                BakeGridHeight();
 
             EditorGUILayout.Space();
 
             // Export
             EditorGUILayout.LabelField( "2. 맵 서브신 Export", EditorStyles.miniBoldLabel );
             _sceneName = EditorGUILayout.TextField( "저장 씬 이름", _sceneName );
+            _bakeGridHeight = EditorGUILayout.ToggleLeft( "Export 시 지형 높이 격자 베이크", _bakeGridHeight );
             _autoBake = EditorGUILayout.ToggleLeft( "Export 시 라이팅 자동 베이크", _autoBake );
             if( true == _autoBake )
                 _bakeLightMode = (LightmapBakeType)EditorGUILayout.EnumPopup( "라이트 모드(자동 전환)", _bakeLightMode );
-            EditorGUILayout.HelpBox( $"출력: {MAPS_FOLDER}/{ResolveSceneName()}.unity\n마커 베이크 → 클론 → 서브신 저장 → Build Settings 등록" + ( _autoBake ? $" → 라이트 {_bakeLightMode} 전환 → 베이크" : "" ), MessageType.None );
+            EditorGUILayout.HelpBox( $"출력: {MAPS_FOLDER}/{ResolveSceneName()}.unity\n마커 베이크" + ( _bakeGridHeight ? " → 지형 높이 격자" : "" ) + " → 클론 → 서브신 저장 → Build Settings 등록" + ( _autoBake ? $" → 라이트 {_bakeLightMode} 전환 → 베이크" : "" ), MessageType.None );
             if( GUILayout.Button( "맵 서브신 Export", GUILayout.Height( 30f ) ) )
                 ExportMapScene();
 
@@ -313,6 +320,117 @@ public class RailMapBuilderWindow : EditorWindow
 
     //@@-------------------------------------------------------------------------------------------------------------------------
     /// <summary>
+    /// 격자 교차점마다 지형 높이를 샘플해 View_GridFloor의 높이맵에 베이크한다.
+    /// 포인트별 우선순위: Terrain.SampleHeight(범위 내) → 아래로 Physics.Raycast → 평면 폴백.
+    /// </summary>
+    private void BakeGridHeight()
+    {
+        if( null == _target )
+            return;
+
+        View_GridFloor grid = _target.GetComponentInChildren<View_GridFloor>( true );
+        if( null == grid )
+        {
+            SetStatus( "View_GridFloor 없음 → 높이 베이크 불가.", true );
+            return;
+        }
+
+        SerializedObject so = new SerializedObject( grid );
+        float worldSize = so.FindProperty( "_worldSize" ).floatValue;
+        float cellSize  = so.FindProperty( "_cellSize" ).floatValue;
+        float baseH     = so.FindProperty( "_height" ).floatValue;
+        if( cellSize < 0.1f )
+            cellSize = 0.1f;
+        if( worldSize < cellSize )
+            worldSize = cellSize;
+
+        float half  = worldSize * 0.5f;
+        int   lines = Mathf.FloorToInt( worldSize / cellSize ) + 1;
+        int   count = lines * lines;
+
+        Transform gt      = grid.transform;
+        Terrain   terrain = _target.GetComponentInChildren<Terrain>( true );
+        if( null == terrain )
+            terrain = Terrain.activeTerrain;
+
+        // 직전 이동된 지오메트리도 raycast가 잡도록 콜라이더 위치 동기화
+        Physics.SyncTransforms();
+
+        float[] samples = new float[ count ];
+        int     hit     = 0;
+        for( int iz = 0; iz < lines; ++iz )
+        {
+            for( int ix = 0; ix < lines; ++ix )
+            {
+                // 격자 로컬 교차점 → 월드
+                Vector3 local = new Vector3( -half + ( ix * cellSize ), baseH, -half + ( iz * cellSize ) );
+                Vector3 world = gt.TransformPoint( local );
+
+                float worldY;
+                if( true == TrySampleHeight( world, terrain, out worldY ) )
+                    ++hit;
+                else
+                    worldY = world.y;   // 폴백: 평면 높이 유지
+
+                // 메시 정점은 로컬 좌표 → 로컬 Y로 환산해 저장
+                samples[ ( iz * lines ) + ix ] = gt.InverseTransformPoint( new Vector3( world.x, worldY, world.z ) ).y;
+            }
+        }
+
+        Undo.RecordObject( grid, "Bake Grid Height" );
+        so.FindProperty( "_useHeightMap" ).boolValue = true;
+        SerializedProperty arr = so.FindProperty( "_heightSamples" );
+        arr.ClearArray();
+        arr.arraySize = count;
+        for( int i = 0; i < count; ++i )
+            arr.GetArrayElementAtIndex( i ).floatValue = samples[ i ];
+        so.ApplyModifiedProperties();
+
+        EditorSceneManager.MarkSceneDirty( grid.gameObject.scene );
+        string src = ( null != terrain ) ? $"Terrain '{terrain.name}'+Raycast" : "Raycast";
+        SetStatus( $"높이 베이크: {lines}x{lines}={count}점, 적중 {hit}/{count} (소스 {src})" + ( ( hit < count ) ? " — 미적중은 평면 폴백" : "" ) );
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// 월드 좌표 (x, z)에서 지형 표면 높이를 샘플한다. Terrain 범위 내면 SampleHeight, 아니면 아래로 Raycast.
+    /// </summary>
+    /// <param name="world">샘플할 월드 위치(y는 격자 평면 기준).</param>
+    /// <param name="terrain">우선 사용할 Terrain(없으면 null).</param>
+    /// <param name="worldY">샘플된 월드 높이.</param>
+    /// <returns>샘플 성공 여부(둘 다 실패 시 false).</returns>
+    private bool TrySampleHeight( Vector3 world, Terrain terrain, out float worldY )
+    {
+        worldY = 0f;
+
+        // 1순위: Terrain (XZ 범위 안일 때만)
+        if( null != terrain && null != terrain.terrainData )
+        {
+            Vector3 tp = terrain.transform.position;
+            Vector3 ts = terrain.terrainData.size;
+            float   lx = world.x - tp.x;
+            float   lz = world.z - tp.z;
+            if( 0f <= lx && lx <= ts.x && 0f <= lz && lz <= ts.z )
+            {
+                worldY = terrain.SampleHeight( world ) + tp.y;
+                return true;
+            }
+        }
+
+        // 2순위: 아래로 Physics.Raycast(콜라이더 필요)
+        Vector3      origin = new Vector3( world.x, world.y + RAY_UP, world.z );
+        RaycastHit   info;
+        if( true == Physics.Raycast( origin, Vector3.down, out info, RAY_UP + RAY_DOWN ) )
+        {
+            worldY = info.point.y;
+            return true;
+        }
+
+        return false;
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
     /// 마커 공유 머티리얼 에셋을 보장하고 스포너에 할당한다.
     /// </summary>
     private void EnsureMarkerMaterial( View_RailMarkerBaker spawner )
@@ -375,6 +493,10 @@ public class RailMapBuilderWindow : EditorWindow
 
         // 1. 마커 선 베이크(최신 보장)
         BakeMarkers();
+
+        // 1-2. 지형 높이 격자 베이크(옵션)
+        if( true == _bakeGridHeight )
+            BakeGridHeight();
 
         EnsureMapsFolder();
 

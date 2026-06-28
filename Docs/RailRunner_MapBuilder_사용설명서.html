@@ -72,7 +72,7 @@
 <h2>0. 개요</h2>
 <p>맵은 <b>실시간 구성이 아니라 서브신(additive scene)으로 미리 베이크</b>해 두고 런타임에 로드한다.
 라이트맵·오클루전 등 베이크 데이터는 씬에 종속되므로 프리팹이 아닌 씬이 컨테이너가 된다.
-빌더 툴이 제어점 정렬 · 격자 맞춤 · 마커 베이크 · 서브신 Export · Build Settings 등록 · 라이팅 베이크를 처리한다.</p>
+빌더 툴이 제어점 정렬 · 격자 맞춤 · 지형 높이 격자 베이크 · 마커 베이크 · 서브신 Export · Build Settings 등록 · 라이팅 베이크를 처리한다.</p>
 
 <div class="note cy">
   <b>전제</b> — 새 씬에 3D 맵(지형·구조물)을 직접 만들었거나 외부에서 가져온 상태. 이 문서는 그 다음부터 다룬다.
@@ -106,7 +106,7 @@
 
   <rect x="160" y="160" width="250" height="42" rx="7" fill="#161b24" stroke="#2ea3ff" stroke-width="1.6"/>
   <text x="178" y="179" fill="#d8dee9" font-size="13.5" font-weight="600">GridFloor</text>
-  <text x="178" y="195" fill="#8a94a6" font-size="11">View_GridFloor  ·  크기 자동 맞춤</text>
+  <text x="178" y="195" fill="#8a94a6" font-size="11">View_GridFloor  ·  크기·높이 자동 맞춤</text>
 
   <rect x="160" y="220" width="250" height="42" rx="7" fill="#161b24" stroke="#ff8027" stroke-width="1.6"/>
   <text x="178" y="239" fill="#d8dee9" font-size="13.5" font-weight="600">Markers</text>
@@ -164,17 +164,27 @@
     <p><b>“격자 여유(m)”</b>를 정한 뒤 <b>“격자 크기 맵에 맞춤”</b> 클릭. RailPath 제어점 + 맵 렌더러를 모두 포함하도록 <code>GridFloor</code>의 크기를 자동 산출한다(격자 중심 기준 최대 반경 + 여유, 칸 크기 배수로 올림).</p>
     <ul class="tight"><li>격자 메시는 로드/플레이 시 재생성 → 저작 씬에선 값만 바뀌고 시각 반영은 Export·실행 후.</li></ul>
   </li>
+  <li class="opt">
+    <h3>지형 높이 격자 베이크 <span class="pill">편의</span></h3>
+    <p><b>“지형 높이 격자 베이크 (Terrain→Raycast)”</b> 클릭. 격자 교차점마다 지형 표면 높이를 샘플해 격자선을 지형에 얹는다(평면 → 굴곡). 포인트별 우선순위:</p>
+    <ul class="tight">
+      <li><b>Terrain</b> 컴포넌트가 있고 그 범위 안이면 <code>Terrain.SampleHeight</code>.</li>
+      <li>아니면 위에서 아래로 <code>Physics.Raycast</code> → <b>지형/구조물에 Collider 필요</b>.</li>
+      <li>둘 다 실패한 교차점은 <b>평면 폴백</b>(상태 박스에 적중 N/총 표시).</li>
+    </ul>
+    <p><b>격자 크기를 바꾼 뒤엔 반드시 재베이크</b>(샘플 수 = 교차점 수, 불일치 시 평면 폴백).</p>
+  </li>
   <li>
     <h3>마커 베이크</h3>
     <p><b>“마커 베이크”</b> 클릭. 머티리얼 없으면 <code>SpeedMarker.mat</code> 자동 생성·할당, RailPath 따라 기둥 구조물을 좌우 교대 생성 + ContributeGI static 부여. (재클릭 시 재생성)</p>
   </li>
   <li>
-    <h3>저장 씬 이름 + 라이팅 옵션</h3>
-    <p><b>“저장 씬 이름”</b>에 출력 파일명을 입력한다(비우면 MapId→대상 이름 순 폴백). <b>“라이팅 자동 베이크”</b>를 켜고 <b>라이트 모드</b>(Mixed 권장 / Baked)를 고른다.</p>
+    <h3>저장 씬 이름 + Export 옵션</h3>
+    <p><b>“저장 씬 이름”</b>에 출력 파일명을 입력한다(비우면 MapId→대상 이름 순 폴백). <b>“Export 시 지형 높이 격자 베이크”</b>(앞 편의 단계를 Export에 자동 포함), <b>“Export 시 라이팅 자동 베이크”</b> + <b>라이트 모드</b>(Mixed 권장 / Baked)를 고른다.</p>
   </li>
   <li>
     <h3>맵 서브신 Export</h3>
-    <p><b>“맵 서브신 Export”</b> 클릭 → <code>Assets/00.Scenes/Maps/&lt;씬이름&gt;.unity</code> 생성. (아래 파이프라인 자동 실행)</p>
+    <p><b>“맵 서브신 Export”</b> 클릭 → <code>Assets/00.Scenes/Maps/&lt;씬이름&gt;.unity</code> 생성. 토글이 켜져 있으면 지형 높이 격자·라이팅도 자동 처리. (아래 파이프라인 자동 실행)</p>
   </li>
   <li>
     <h3>완료 확인</h3>
@@ -182,61 +192,71 @@
   </li>
 </ol>
 
+<div class="note">
+  <b>권장 순서</b> — <code>제어점 정렬 → 격자 크기 맞춤 → 지형 높이 베이크 → 마커 베이크 → Export</code>. 높이 베이크는 <b>격자 크기 확정 후</b>에 해야 샘플 수가 맞는다. 크기를 다시 바꾸면 높이도 다시 베이크.
+</div>
+
 <div class="note cy">
   <b>주의</b> — 런타임 로더 <code>View_MapLoader</code>는 <b>씬 이름</b>으로 로드한다. 저장 씬 이름을 MapId와 다르게 지정했다면 로더의 <code>_mapId</code>도 그 이름에 맞춰야 한다.
 </div>
 
 <h2>3. 빌더 창 구성</h2>
 <div class="fig">
-<svg viewBox="0 0 520 612" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
-  <rect x="10" y="10" width="500" height="592" rx="10" fill="#161b24" stroke="#2a3340" stroke-width="1.5"/>
+<svg viewBox="0 0 520 668" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+  <rect x="10" y="10" width="500" height="648" rx="10" fill="#161b24" stroke="#2a3340" stroke-width="1.5"/>
   <rect x="10" y="10" width="500" height="34" rx="10" fill="#1d2430"/>
   <circle cx="30" cy="27" r="5" fill="#ff8027"/>
   <text x="48" y="32" fill="#d8dee9" font-size="13" font-weight="600">Rail Map Builder</text>
   <text x="28" y="66" fill="#d8dee9" font-size="14" font-weight="700">RailRunner 맵 빌더</text>
 
-  <text x="28" y="92" fill="#8a94a6" font-size="11.5">대상 맵 (View_RailMap)</text>
-  <rect x="28" y="98" width="464" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
-  <text x="38" y="114" fill="#3ddc84" font-size="12">Map_RailRunner (View_RailMap)</text>
-  <rect x="28" y="128" width="464" height="24" rx="5" fill="#1d2430" stroke="#2a3340"/>
-  <text x="184" y="144" fill="#d8dee9" font-size="12">현재 씬에서 자동 탐색</text>
+  <text x="28" y="90" fill="#8a94a6" font-size="11.5">대상 맵 (View_RailMap)</text>
+  <rect x="28" y="96" width="464" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
+  <text x="38" y="112" fill="#3ddc84" font-size="12">Map_RailRunner (View_RailMap)</text>
+  <rect x="28" y="126" width="464" height="24" rx="5" fill="#1d2430" stroke="#2a3340"/>
+  <text x="184" y="142" fill="#d8dee9" font-size="12">현재 씬에서 자동 탐색</text>
 
-  <text x="28" y="178" fill="#b18cff" font-size="11.5">RailPath · 격자 정리</text>
-  <rect x="28" y="184" width="464" height="26" rx="5" fill="#241b33" stroke="#4a3a66"/>
-  <text x="150" y="201" fill="#c9b3ff" font-size="12">제어점 자동 정렬·등록 (CP_n)</text>
-  <rect x="28" y="216" width="150" height="26" rx="5" fill="#0e1116" stroke="#2a3340"/>
-  <text x="38" y="233" fill="#8a94a6" font-size="11">격자 여유(m)</text>
-  <text x="150" y="233" fill="#d8dee9" font-size="11">6</text>
-  <rect x="186" y="216" width="306" height="26" rx="5" fill="#241b33" stroke="#4a3a66"/>
-  <text x="268" y="233" fill="#c9b3ff" font-size="12">격자 크기 맵에 맞춤</text>
+  <text x="28" y="172" fill="#b18cff" font-size="11.5">RailPath · 격자 정리</text>
+  <rect x="28" y="178" width="464" height="26" rx="5" fill="#241b33" stroke="#4a3a66"/>
+  <text x="150" y="195" fill="#c9b3ff" font-size="12">제어점 자동 정렬·등록 (CP_n)</text>
+  <rect x="28" y="210" width="150" height="26" rx="5" fill="#0e1116" stroke="#2a3340"/>
+  <text x="38" y="227" fill="#8a94a6" font-size="11">격자 여유(m)</text>
+  <text x="150" y="227" fill="#d8dee9" font-size="11">6</text>
+  <rect x="186" y="210" width="306" height="26" rx="5" fill="#241b33" stroke="#4a3a66"/>
+  <text x="268" y="227" fill="#c9b3ff" font-size="12">격자 크기 맵에 맞춤</text>
+  <rect x="28" y="242" width="464" height="26" rx="5" fill="#241b33" stroke="#4a3a66"/>
+  <text x="120" y="259" fill="#c9b3ff" font-size="12">지형 높이 격자 베이크 (Terrain→Raycast)</text>
 
-  <text x="28" y="270" fill="#8a94a6" font-size="11.5">1. 마커</text>
-  <rect x="28" y="276" width="228" height="28" rx="5" fill="#1d2a36" stroke="#2ea3ff"/>
-  <text x="98" y="294" fill="#2ea3ff" font-size="12.5" font-weight="600">마커 베이크</text>
-  <rect x="264" y="276" width="228" height="28" rx="5" fill="#1d2430" stroke="#2a3340"/>
-  <text x="338" y="294" fill="#d8dee9" font-size="12.5">마커 클리어</text>
+  <text x="28" y="294" fill="#8a94a6" font-size="11.5">1. 마커</text>
+  <rect x="28" y="300" width="228" height="28" rx="5" fill="#1d2a36" stroke="#2ea3ff"/>
+  <text x="98" y="318" fill="#2ea3ff" font-size="12.5" font-weight="600">마커 베이크</text>
+  <rect x="264" y="300" width="228" height="28" rx="5" fill="#1d2430" stroke="#2a3340"/>
+  <text x="338" y="318" fill="#d8dee9" font-size="12.5">마커 클리어</text>
 
-  <text x="28" y="332" fill="#8a94a6" font-size="11.5">2. 맵 서브신 Export</text>
-  <rect x="28" y="338" width="150" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
-  <text x="38" y="354" fill="#8a94a6" font-size="11">저장 씬 이름</text>
-  <rect x="186" y="338" width="306" height="24" rx="5" fill="#0e1116" stroke="#2ea3ff"/>
-  <text x="196" y="354" fill="#ffd54a" font-size="12">Map_RailRunner</text>
-  <rect x="28" y="370" width="16" height="16" rx="3" fill="#2ea3ff"/>
-  <path d="M31,378 l3,3 l6,-7" fill="none" stroke="#04121f" stroke-width="2"/>
-  <text x="52" y="383" fill="#d8dee9" font-size="12">Export 시 라이팅 자동 베이크</text>
-  <text x="28" y="408" fill="#8a94a6" font-size="11.5">라이트 모드(자동 전환)</text>
-  <rect x="210" y="396" width="282" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
-  <text x="222" y="412" fill="#ffd54a" font-size="12">Mixed  ▾</text>
-  <rect x="28" y="430" width="464" height="40" rx="6" fill="#1f2a1c" stroke="#3ddc84" stroke-width="1.6"/>
-  <text x="60" y="455" fill="#3ddc84" font-size="14" font-weight="700">맵 서브신 Export</text>
+  <text x="28" y="356" fill="#8a94a6" font-size="11.5">2. 맵 서브신 Export</text>
+  <rect x="28" y="362" width="150" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
+  <text x="38" y="378" fill="#8a94a6" font-size="11">저장 씬 이름</text>
+  <rect x="186" y="362" width="306" height="24" rx="5" fill="#0e1116" stroke="#2ea3ff"/>
+  <text x="196" y="378" fill="#ffd54a" font-size="12">Map_RailRunner</text>
+  <rect x="28" y="394" width="16" height="16" rx="3" fill="#b18cff"/>
+  <path d="M31,402 l3,3 l6,-7" fill="none" stroke="#04121f" stroke-width="2"/>
+  <text x="52" y="407" fill="#d8dee9" font-size="12">Export 시 지형 높이 격자 베이크</text>
+  <rect x="28" y="418" width="16" height="16" rx="3" fill="#2ea3ff"/>
+  <path d="M31,426 l3,3 l6,-7" fill="none" stroke="#04121f" stroke-width="2"/>
+  <text x="52" y="431" fill="#d8dee9" font-size="12">Export 시 라이팅 자동 베이크</text>
+  <text x="28" y="456" fill="#8a94a6" font-size="11.5">라이트 모드(자동 전환)</text>
+  <rect x="210" y="444" width="282" height="24" rx="5" fill="#0e1116" stroke="#2a3340"/>
+  <text x="222" y="460" fill="#ffd54a" font-size="12">Mixed  ▾</text>
+  <rect x="28" y="478" width="464" height="40" rx="6" fill="#1f2a1c" stroke="#3ddc84" stroke-width="1.6"/>
+  <text x="60" y="503" fill="#3ddc84" font-size="14" font-weight="700">맵 서브신 Export</text>
 
-  <text x="28" y="500" fill="#8a94a6" font-size="11.5">3. 라이팅 (수동)</text>
-  <rect x="28" y="506" width="464" height="26" rx="5" fill="#1d2430" stroke="#2a3340"/>
-  <text x="150" y="523" fill="#d8dee9" font-size="12">현재 열린 씬 라이팅 베이크</text>
+  <text x="28" y="546" fill="#8a94a6" font-size="11.5">3. 라이팅 (수동)</text>
+  <rect x="28" y="552" width="464" height="26" rx="5" fill="#1d2430" stroke="#2a3340"/>
+  <text x="150" y="569" fill="#d8dee9" font-size="12">현재 열린 씬 라이팅 베이크</text>
 
-  <rect x="28" y="552" width="464" height="34" rx="4" fill="#11202c"/>
-  <text x="38" y="566" fill="#8a94a6" font-size="10.5">상태</text>
-  <text x="38" y="580" fill="#2ea3ff" font-size="11">Export 완료 + 라이트 Mixed 전환 + 베이크(성공)</text>
+  <rect x="28" y="596" width="464" height="48" rx="4" fill="#11202c"/>
+  <text x="38" y="612" fill="#8a94a6" font-size="10.5">상태</text>
+  <text x="38" y="628" fill="#2ea3ff" font-size="11">높이 베이크: 41x41=1681점, 적중 1681/1681 (소스 Raycast)</text>
+  <text x="38" y="642" fill="#2ea3ff" font-size="11">Export 완료 + 라이트 Mixed 전환 + 베이크(성공)</text>
 </svg>
 <div class="cap">그림 2. Map Builder 창 (목업) — 보라색 = 편의 도구</div>
 </div>
@@ -244,7 +264,7 @@
 <h2>4. Export 파이프라인</h2>
 <p>“맵 서브신 Export” 한 번에 실행되는 내부 순서다.</p>
 <div class="fig">
-<svg viewBox="0 0 880 150" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
+<svg viewBox="0 0 1030 150" xmlns="http://www.w3.org/2000/svg" font-family="Segoe UI, sans-serif">
   <defs>
     <marker id="a2" markerWidth="9" markerHeight="9" refX="6" refY="3" orient="auto">
       <path d="M0,0 L6,3 L0,6 Z" fill="#2ea3ff"/>
@@ -254,21 +274,24 @@
     <rect x="10"  y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#ff8027" stroke-width="1.6"/>
     <text x="69" y="71" fill="#d8dee9" text-anchor="middle">마커 베이크</text>
     <text x="69" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">+GI static</text>
-    <rect x="158" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#2ea3ff" stroke-width="1.6"/>
-    <text x="217" y="71" fill="#d8dee9" text-anchor="middle">루트 클론</text>
-    <text x="217" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">빈 씬으로 이동</text>
+    <rect x="158" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#b18cff" stroke-width="1.6"/>
+    <text x="217" y="71" fill="#d8dee9" text-anchor="middle">지형 높이 격자</text>
+    <text x="217" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">Terrain→Raycast</text>
     <rect x="306" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#2ea3ff" stroke-width="1.6"/>
-    <text x="365" y="71" fill="#d8dee9" text-anchor="middle">서브신 저장</text>
-    <text x="365" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">Maps/&lt;씬이름&gt;</text>
+    <text x="365" y="71" fill="#d8dee9" text-anchor="middle">루트 클론</text>
+    <text x="365" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">빈 씬으로 이동</text>
     <rect x="454" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#2ea3ff" stroke-width="1.6"/>
-    <text x="513" y="71" fill="#d8dee9" text-anchor="middle">Build 등록</text>
-    <text x="513" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">중복 방지</text>
-    <rect x="602" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#ffd54a" stroke-width="1.6"/>
-    <text x="661" y="71" fill="#d8dee9" text-anchor="middle">라이트 전환</text>
-    <text x="661" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">Mixed/Baked</text>
-    <rect x="750" y="50" width="118" height="50" rx="8" fill="#1f2a1c" stroke="#3ddc84" stroke-width="1.8"/>
-    <text x="809" y="71" fill="#3ddc84" text-anchor="middle">라이팅 베이크</text>
-    <text x="809" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">완료</text>
+    <text x="513" y="71" fill="#d8dee9" text-anchor="middle">서브신 저장</text>
+    <text x="513" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">Maps/&lt;씬이름&gt;</text>
+    <rect x="602" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#2ea3ff" stroke-width="1.6"/>
+    <text x="661" y="71" fill="#d8dee9" text-anchor="middle">Build 등록</text>
+    <text x="661" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">중복 방지</text>
+    <rect x="750" y="50" width="118" height="50" rx="8" fill="#161b24" stroke="#ffd54a" stroke-width="1.6"/>
+    <text x="809" y="71" fill="#d8dee9" text-anchor="middle">라이트 전환</text>
+    <text x="809" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">Mixed/Baked</text>
+    <rect x="898" y="50" width="118" height="50" rx="8" fill="#1f2a1c" stroke="#3ddc84" stroke-width="1.8"/>
+    <text x="957" y="71" fill="#3ddc84" text-anchor="middle">라이팅 베이크</text>
+    <text x="957" y="88" fill="#8a94a6" text-anchor="middle" font-size="10" font-weight="400">완료</text>
   </g>
   <g stroke="#2ea3ff" stroke-width="1.6">
     <path d="M128,75 L156,75" marker-end="url(#a2)"/>
@@ -276,8 +299,9 @@
     <path d="M424,75 L452,75" marker-end="url(#a2)"/>
     <path d="M572,75 L600,75" marker-end="url(#a2)"/>
     <path d="M720,75 L748,75" marker-end="url(#a2)"/>
+    <path d="M868,75 L896,75" marker-end="url(#a2)"/>
   </g>
-  <text x="440" y="28" fill="#8a94a6" text-anchor="middle" font-size="11.5">라이트 전환·베이크 2단계는 “자동 베이크” 토글 ON일 때만 실행</text>
+  <text x="515" y="28" fill="#8a94a6" text-anchor="middle" font-size="11.5">지형 높이 격자 / 라이트 전환·베이크 단계는 각 토글 ON일 때만 실행</text>
 </svg>
 <div class="cap">그림 3. Export 내부 파이프라인</div>
 </div>
@@ -331,6 +355,8 @@
   <tr><th>증상</th><th>원인 / 해결</th></tr>
   <tr><td>제어점이 등록 안 됨</td><td>“제어점 자동 정렬·등록” 미실행, 또는 RailPath 자식 4개 미만 → 자식 추가 후 버튼.</td></tr>
   <tr><td>격자가 맵을 못 덮음</td><td>“격자 크기 맵에 맞춤” 실행. 여유(m)를 키우거나, 멀리 떨어진 렌더러가 바운드를 키우는지 확인.</td></tr>
+  <tr><td>격자가 지형 높이를 안 따라감</td><td>“지형 높이 격자 베이크” 미실행, 또는 지형/구조물에 <b>Collider·Terrain 없음</b>(미적중은 평면 폴백). 적중률은 상태 박스 확인.</td></tr>
+  <tr><td>높이 베이크 후 격자가 평면</td><td>격자 크기 변경 후 재베이크 안 함 → 샘플 수 불일치로 평면 폴백(콘솔 경고). 크기 확정 후 재베이크.</td></tr>
   <tr><td>“View_RailMarkerBaker 없음”</td><td>맵 루트 하위에 Markers(베이커) 컴포넌트 누락 → 추가 후 RailPath 연결.</td></tr>
   <tr><td>서브신에 라이트 없음</td><td>Directional Light가 맵 루트 자식이 아님 → 루트 하위로 이동 후 재 Export.</td></tr>
   <tr><td>라이트맵이 안 구워짐</td><td>씬 Lighting의 <b>Baked Global Illumination</b> OFF → ON. 마커는 ContributeGI 자동.</td></tr>
