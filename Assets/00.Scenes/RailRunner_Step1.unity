@@ -122,6 +122,80 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1001 &291756446
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 1073749212}
+    m_Modifications:
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalPosition.y
+      value: -0.98
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 3.64
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 919132149155446097, guid: f1b8237e44a8f6342b128a034fa24616,
+        type: 3}
+      propertyPath: m_Name
+      value: Mecha_Gril_A01_Base
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: f1b8237e44a8f6342b128a034fa24616, type: 3}
+--- !u!4 &291756447 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: f1b8237e44a8f6342b128a034fa24616,
+    type: 3}
+  m_PrefabInstance: {fileID: 291756446}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &1073749208
 GameObject:
   m_ObjectHideFlags: 0
@@ -240,7 +314,8 @@ Transform:
   m_LocalPosition: {x: -30, y: 3, z: -40}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 291756447}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &1073749213
@@ -373,7 +448,7 @@ MonoBehaviour:
   _manualZones: []
   _lookAheadDistance: 12
   _lookAheadSpeedFactor: 0.25
-  _verboseLog: 1
+  _verboseLog: 0
 --- !u!4 &1583991157
 Transform:
   m_ObjectHideFlags: 0
