@@ -6,6 +6,9 @@ EditorBuildSettings:
   serializedVersion: 2
   m_Scenes:
   - enabled: 1
-    path: Assets/00.Scenes/SampleScene.unity
-    guid: 99c9720ab356a0642a771bea13969a05
+    path: Assets/00.Scenes/RailRunner_Step1.unity
+    guid: cf8e5f89b809d6646a75bb1b5156a31b
+  - enabled: 1
+    path: Assets/00.Scenes/Maps/Map_RailRunner.unity
+    guid: 7e00d2b10076f1f47b1000593ee1b80a
   m_configObjects: {}

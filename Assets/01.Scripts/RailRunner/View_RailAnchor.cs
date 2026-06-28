@@ -105,16 +105,16 @@ public class View_RailAnchor : MonoBehaviour
     
     private void Start()
     {
-        if( null == _rail || false == _rail.IsReady )
+        // 레일이 미리 지정된 경우(저작/단일 씬) 즉시 주행 시작.
+        // 미지정이면 외부 로더의 BindRail() 호출을 대기(Idle).
+        if( null == _rail )
         {
             _state = eAnchorState.Idle;
-            DebugExtensions.LogError( "[View_RailAnchor] 레일 미준비 → Idle. 주행 불가.", Color.red );
+            DebugExtensions.Log( "[View_RailAnchor] 레일 미지정 → BindRail() 대기.", Color.gray );
             return;
         }
 
-        _state        = eAnchorState.Running;
-        _currentSpeed = _minSpeed;
-        SampleRail();
+        TryBeginRun();
     }
 
     //@@-------------------------------------------------------------------------------------------------------------------------
@@ -128,6 +128,54 @@ public class View_RailAnchor : MonoBehaviour
     }
 
     #endregion
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// 외부(맵 로더)에서 런타임에 레일을 주입하고 주행을 시작한다.
+    /// 부트스트랩 씬 + additive 맵 로드 흐름의 진입점.
+    /// </summary>
+    /// <param name="rail">로드된 맵의 레일.</param>
+    public void BindRail( View_RailPath rail )
+    {
+        if( null == rail )
+        {
+            _state = eAnchorState.Idle;
+            DebugExtensions.LogError( "[View_RailAnchor] BindRail 레일이 null → Idle.", Color.red );
+            return;
+        }
+
+        _rail = rail;
+        TryBeginRun();
+    }
+
+    //@@-------------------------------------------------------------------------------------------------------------------------
+    /// <summary>
+    /// 레일 준비를 확인하고 주행 상태로 진입한다. 거리/속도/곡률/루프 카운트를 초기화한다.
+    /// </summary>
+    private void TryBeginRun()
+    {
+        if( null == _rail )
+            return;
+
+        if( false == _rail.IsReady )
+            _rail.Rebuild();
+
+        if( false == _rail.IsReady )
+        {
+            _state = eAnchorState.Idle;
+            DebugExtensions.LogError( "[View_RailAnchor] 레일 준비 실패 → Idle. 주행 불가.", Color.red );
+            return;
+        }
+
+        _distance          = 0f;
+        _currentSpeed      = _minSpeed;
+        _currentCurvature  = 0f;
+        _currentSignedCurv = 0f;
+        _lapCount          = 0;
+        _state             = eAnchorState.Running;
+        SampleRail();
+        DebugExtensions.Log( $"[View_RailAnchor] 주행 시작. 레일 길이 {_rail.TotalLength:F1}m", Color.cyan );
+    }
 
     //@@-------------------------------------------------------------------------------------------------------------------------
     /// <summary>
